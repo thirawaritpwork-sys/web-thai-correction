@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  thai-text-corrector:
+    volumes:
+      # Mount source code for development
+      - .:/app
+      - /app/__pycache__  # Exclude Python cache
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - PYTHONUNBUFFERED=1
+    command: /docker-entrypoint.sh

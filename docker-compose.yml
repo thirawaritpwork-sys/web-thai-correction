@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  thai-text-corrector:
+    build: .
+    container_name: thai-text-corrector
+    ports:
+      - "5000:5000"  # Corpus Server
+      - "5001:5001"  # Tokenizer Server
+    volumes:
+      - ./main-corpus.json:/app/main-corpus.json
+      - ./audio:/app/audio
+      - ./sample-data.tsv:/app/sample-data.tsv
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/corpus", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
