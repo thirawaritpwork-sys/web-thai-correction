@@ -4,8 +4,10 @@ class ThaiTextCorrector {
         this.corrections = [];
         this.currentIndex = 0;
         this.correctionCorpus = new Map(); // Store incorrect -> correct mappings
+        this.tokenizerEnabled = false; // Flag for tokenizer features
         this.init();
         this.loadCorpus(); // เปลี่ยนเป็น async call
+        this.checkTokenizerServer(); // Check if tokenizer server is available
     }
 
     init() {
@@ -20,9 +22,9 @@ class ThaiTextCorrector {
         document.getElementById('viewCorpusBtn').addEventListener('click', () => this.showCorpus());
         document.getElementById('addToCorpusBtn').addEventListener('click', () => this.addToCorpus());
         document.getElementById('clearCorpusBtn').addEventListener('click', () => this.clearCorpus());
-        document.getElementById('exportCorpusBtn').addEventListener('click', () => this.exportCorpus());
-        document.getElementById('importCorpusBtn').addEventListener('click', () => this.importCorpus());
-        document.getElementById('resetDefaultsBtn').addEventListener('click', () => this.resetDefaults());
+        
+        // Tokenizer features (will be enabled if server is available)
+        document.getElementById('tokenizeBtn')?.addEventListener('click', () => this.tokenizeCurrentText());
         
         // Audio controls
         document.getElementById('audioUpload').addEventListener('change', (e) => this.handleAudioUpload(e));
@@ -33,6 +35,39 @@ class ThaiTextCorrector {
         document.getElementById('fastBtn').addEventListener('click', () => this.setPlaybackSpeed(1.25));
         
         this.toggleApiKey();
+    }
+
+    async checkTokenizerServer() {
+        try {
+            const response = await fetch('http://localhost:5001/api/health');
+            if (response.ok) {
+                this.tokenizerEnabled = true;
+                this.showTokenizerFeatures();
+                console.log('✅ Tokenizer server available - Smart learning enabled');
+            }
+        } catch (error) {
+            console.log('ℹ️ Tokenizer server not available - Using basic corpus learning');
+        }
+    }
+
+    showTokenizerFeatures() {
+        // Show tokenizer buttons if they exist in HTML
+        const tokenizerSection = document.getElementById('tokenizerSection');
+        if (tokenizerSection) {
+            tokenizerSection.style.display = 'block';
+        }
+        
+        // Add tokenizer info to corpus section
+        const corpusSection = document.querySelector('.corpus-controls');
+        if (corpusSection && !document.getElementById('tokenizerInfo')) {
+            const tokenizerInfo = document.createElement('div');
+            tokenizerInfo.id = 'tokenizerInfo';
+            tokenizerInfo.className = 'alert alert-info mt-2';
+            tokenizerInfo.innerHTML = `
+                <small>🔤 <strong>Tokenizer:</strong> Thai word tokenization available</small>
+            `;
+            corpusSection.appendChild(tokenizerInfo);
+        }
     }
 
     async loadCorpus() {
@@ -542,9 +577,14 @@ class ThaiTextCorrector {
         const originalText = this.tsvData[this.currentIndex].text;
         const correctedText = document.getElementById('correctedText').value.trim();
         
+        console.log('Accept correction:', { originalText, correctedText });
+        
         // If text was changed, add to corpus for future auto-corrections
         if (originalText !== correctedText) {
+            console.log('Text changed, learning from correction...');
             this.learnFromCorrection(originalText, correctedText);
+        } else {
+            console.log('No changes detected, skipping learning');
         }
         
         this.corrections[this.currentIndex].corrected = correctedText;
@@ -553,9 +593,61 @@ class ThaiTextCorrector {
     }
 
     learnFromCorrection(originalText, correctedText) {
+        if (this.tokenizerEnabled) {
+            // Use tokenizer for better word segmentation
+            this.tokenizedLearnFromCorrection(originalText, correctedText);
+        } else {
+            // Use basic word-by-word learning
+            this.basicLearnFromCorrection(originalText, correctedText);
+        }
+    }
+
+    async tokenizedLearnFromCorrection(originalText, correctedText) {
+        try {
+            // Get tokens from both texts
+            const [originalResult, correctedResult] = await Promise.all([
+                this.callTokenizerAPI('/api/tokenize', { text: originalText }),
+                this.callTokenizerAPI('/api/tokenize', { text: correctedText })
+            ]);
+
+            if (originalResult && correctedResult) {
+                const originalTokens = originalResult.tokens;
+                const correctedTokens = correctedResult.tokens;
+
+                // Find token-level differences
+                const maxLen = Math.max(originalTokens.length, correctedTokens.length);
+                for (let i = 0; i < maxLen; i++) {
+                    const origToken = originalTokens[i] || '';
+                    const corrToken = correctedTokens[i] || '';
+                    
+                    if (origToken !== corrToken && origToken.trim() && corrToken.trim()) {
+                        // Skip whitespace and punctuation
+                        if (origToken.length > 1 && corrToken.length > 1) {
+                            this.correctionCorpus.set(origToken, corrToken);
+                            console.log(`Tokenized learning: ${origToken} → ${corrToken}`);
+                        }
+                    }
+                }
+            } else {
+                // Fallback to basic learning if tokenizer fails
+                this.basicLearnFromCorrection(originalText, correctedText);
+            }
+        } catch (error) {
+            console.log('Tokenized learning failed, using basic method:', error);
+            this.basicLearnFromCorrection(originalText, correctedText);
+        }
+        
+        this.saveCorpus();
+    }
+
+    basicLearnFromCorrection(originalText, correctedText) {
+        console.log('Basic learning from:', { originalText, correctedText });
+        
         // Extract word-level differences and add to corpus
         const originalWords = originalText.split(/\s+/);
         const correctedWords = correctedText.split(/\s+/);
+        
+        console.log('Words comparison:', { originalWords, correctedWords });
         
         // Simple word-by-word comparison
         for (let i = 0; i < Math.min(originalWords.length, correctedWords.length); i++) {
@@ -569,7 +661,89 @@ class ThaiTextCorrector {
             }
         }
         
+        console.log('Current corpus size:', this.correctionCorpus.size);
         this.saveCorpus();
+    }
+
+    async tokenizeCurrentText() {
+        if (!this.tokenizerEnabled) {
+            alert('Tokenizer server ไม่พร้อมใช้งาน');
+            return;
+        }
+
+        const currentText = document.getElementById('correctedText').value;
+        if (!currentText.trim()) {
+            alert('ไม่มีข้อความที่จะตัดคำ');
+            return;
+        }
+
+        try {
+            const result = await this.callTokenizerAPI('/api/tokenize', { text: currentText });
+            
+            if (result) {
+                this.showTokenizeResult(result);
+            } else {
+                alert('ไม่สามารถตัดคำได้');
+            }
+        } catch (error) {
+            alert('เกิดข้อผิดพลาดในการตัดคำ: ' + error.message);
+        }
+    }
+
+    async callTokenizerAPI(endpoint, data) {
+        try {
+            const response = await fetch(`http://localhost:5001${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (error) {
+            console.log(`Tokenizer API call failed: ${endpoint}`, error);
+        }
+        return null;
+    }
+
+    showTokenizeResult(result) {
+        const modalHTML = `
+            <div class="modal fade" id="tokenizeModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">🔤 ผลการตัดคำ</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <strong>ข้อความต้นฉบับ:</strong><br>
+                                <div class="bg-light p-2 rounded">${result.original}</div>
+                            </div>
+                            <div class="mb-3">
+                                <strong>คำที่ตัดได้ (${result.token_count} คำ):</strong><br>
+                                <div class="bg-light p-2 rounded">
+                                    ${result.tokens.map(token => `<span class="badge bg-secondary me-1">${token}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        this.showModal(modalHTML, 'tokenizeModal');
+    }
+
+    showModal(modalHTML, modalId) {
+        // Remove existing modal if any
+        const existingModal = document.getElementById(modalId);
+        if (existingModal) existingModal.remove();
+
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        new bootstrap.Modal(document.getElementById(modalId)).show();
     }
 
     addToCorpus() {
@@ -629,64 +803,6 @@ class ThaiTextCorrector {
             this.correctionCorpus.clear();
             this.saveCorpus();
             alert('ลบคลังข้อมูลแล้ว');
-        }
-    }
-
-    exportCorpus() {
-        const corpusData = {
-            exportDate: new Date().toISOString(),
-            version: "1.0",
-            corrections: Array.from(this.correctionCorpus.entries())
-        };
-        
-        const jsonContent = JSON.stringify(corpusData, null, 2);
-        this.downloadFile(jsonContent, 'thai_correction_corpus.json', 'application/json');
-        alert('ส่งออกคลังข้อมูลแล้ว!');
-    }
-
-    importCorpus() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const data = JSON.parse(event.target.result);
-                        
-                        if (data.corrections && Array.isArray(data.corrections)) {
-                            let importedCount = 0;
-                            
-                            for (const [incorrect, correct] of data.corrections) {
-                                this.correctionCorpus.set(incorrect, correct);
-                                importedCount++;
-                            }
-                            
-                            this.saveCorpus();
-                            alert(`นำเข้าคลังข้อมูลสำเร็จ! เพิ่ม ${importedCount} รายการ`);
-                        } else {
-                            alert('รูปแบบไฟล์ไม่ถูกต้อง');
-                        }
-                    } catch (error) {
-                        alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + error.message);
-                    }
-                };
-                reader.readAsText(file);
-            }
-        };
-        
-        input.click();
-    }
-
-    resetDefaults() {
-        if (confirm('ต้องการรีเซ็ตคลังข้อมูลจาก main-corpus.json หรือไม่? (จะลบข้อมูลปัจจุบันทั้งหมด)')) {
-            this.correctionCorpus.clear();
-            localStorage.removeItem('thaiCorrectionCorpus');
-            this.loadMainCorpus();
-            alert('รีเซ็ตคลังข้อมูลจาก main-corpus.json แล้ว!');
         }
     }
 

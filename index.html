@@ -90,9 +90,6 @@
                     <div class="d-flex gap-2 flex-wrap">
                         <button id="viewCorpusBtn" class="btn btn-info btn-sm">👁️ ดูคลังข้อมูล</button>
                         <button id="addToCorpusBtn" class="btn btn-success btn-sm">➕ เพิ่มคำ</button>
-                        <button id="exportCorpusBtn" class="btn btn-warning btn-sm">📤 ส่งออก</button>
-                        <button id="importCorpusBtn" class="btn btn-secondary btn-sm">📥 นำเข้า</button>
-                        <button id="resetDefaultsBtn" class="btn btn-outline-primary btn-sm">🔄 รีเซ็ต</button>
                         <button id="clearCorpusBtn" class="btn btn-danger btn-sm">🗑️ ลบทั้งหมด</button>
                     </div>
                     <small class="text-muted">คลังข้อมูลจะช่วยแก้ไขคำผิดอัตโนมัติ เช่น "การจนบุรี" → "กาญจนบุรี"</small>
@@ -150,10 +147,15 @@
                     <h6>ข้อความที่แก้ไขแล้ว:</h6>
                     <textarea id="correctedText" class="form-control mb-3" rows="3"></textarea>
                     
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 flex-wrap">
                         <button id="aiCorrectBtn" class="btn btn-warning">🤖 ใช้ AI แก้ไข</button>
                         <button id="acceptBtn" class="btn btn-success">✅ ยอมรับ</button>
                         <button id="skipBtn" class="btn btn-secondary">⏭️ ข้าม</button>
+                        
+                        <!-- Tokenizer Features (shown only when server is available) -->
+                        <div id="tokenizerSection" style="display: none;" class="d-flex gap-2">
+                            <button id="tokenizeBtn" class="btn btn-outline-info btn-sm">🔤 ตัดคำ</button>
+                        </div>
                     </div>
                 </div>
             </div>
