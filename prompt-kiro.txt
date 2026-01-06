@@ -1,0 +1,169 @@
+# Thai Text Corrector - Complete Project Summary
+
+## **Project Overview**
+A comprehensive web-based Thai text correction application that combines AI-powered correction with intelligent corpus learning. Designed for non-technical teams to efficiently correct Thai text datasets with audio support.
+
+## **Core Objectives**
+1. **TSV File Processing** - Load TSV files with 'text' and 'file_name' columns
+2. **Sequential Text Correction** - Process each text item one-by-one with progress tracking
+3. **AI-Powered Correction** - Multiple AI backends with standardized Thai correction prompts
+4. **Audio Integration** - Play corresponding audio files while correcting text
+5. **Intelligent Learning** - Auto-learning corpus that improves over time
+6. **Manual Override** - Full manual editing capabilities with accept/skip controls
+7. **Data Persistence** - Automatic saving and loading of corrections and corpus data
+
+## **Technical Architecture**
+
+### **Frontend (Pure HTML/JS/Bootstrap)**
+- **index.html** - Main application interface with Thai-optimized UI
+- **script.js** - Core application logic with ThaiTextCorrector class
+- **Bootstrap 5** - Responsive UI framework with Thai font support
+
+### **Backend Options**
+- **Client-only** - Pure browser-based operation
+- **corpus-server.py** - Optional Flask server for file I/O operations
+
+### **Data Management**
+- **main-corpus.json** - Master correction corpus file
+- **localStorage** - Browser-based temporary storage
+- **Auto-sync** - Bidirectional sync between file and browser storage
+
+## **AI Integration**
+
+### **Supported AI Backends**
+1. **Google Gemini API** - Cloud-based with API key authentication
+2. **Ollama** - Local LLM server (llama2, mistral, gemma, thai-llama)
+3. **OpenAI-Compatible APIs** - Works with Text Generation WebUI, LocalAI, LM Studio, Kobold.cpp
+4. **Manual Mode** - Pure human correction without AI
+
+### **Standardized Prompt Format**
+```
+ทำการแก้ไขข้อความที่ผิด และไม่ถูกต้องในบริบท
+คำต้นฉบับ:<WRD>original_text</WRD>
+คำที่ถูกต้อง:<WRD>(corrected_text)</WRD>
+```
+
+## **Intelligent Corpus System**
+
+### **Auto-Learning Features**
+- **Pattern Recognition** - Learns from manual corrections
+- **Word-level Mapping** - Stores incorrect → correct word pairs
+- **Auto-Application** - Applies learned corrections to future texts
+- **Persistent Storage** - Maintains corpus across sessions
+
+### **Corpus Management**
+- **View Corpus** - Browse all stored corrections
+- **Manual Addition** - Add custom correction pairs
+- **Import/Export** - JSON-based corpus sharing
+- **Reset Function** - Restore to default corrections
+- **File Sync** - Updates main-corpus.json automatically
+
+## **Audio Integration**
+
+### **Audio Features**
+- **Auto-Detection** - Loads audio based on file_name column
+- **Manual Upload** - Support for user-provided audio files
+- **Playback Controls** - Play, pause, speed adjustment (0.75x, 1x, 1.25x)
+- **Format Support** - WAV, MP3, M4A, OGG compatibility
+- **Synchronized Display** - Audio filename shown with text
+
+### **Audio Workflow**
+1. Load TSV with audio references
+2. Place audio files in `/audio/` directory
+3. Auto-load audio for each text item
+4. Listen while correcting text
+5. Manual upload option for missing files
+
+## **Data Processing Workflow**
+
+### **Input Processing**
+1. **File Upload** - TSV file with required columns
+2. **Validation** - Check for 'text' column presence
+3. **Parsing** - Extract text and metadata
+4. **Audio Mapping** - Link audio files to text entries
+
+### **Correction Process**
+1. **Auto-Correction** - Apply existing corpus rules
+2. **AI Processing** - Send to selected AI backend
+3. **Manual Review** - User can edit AI suggestions
+4. **Learning** - Extract new correction patterns
+5. **Corpus Update** - Add new corrections to database
+
+### **Output Generation**
+1. **Corrected TSV** - Original format with corrected text
+2. **Results JSON** - Detailed correction log with metadata
+3. **Updated Corpus** - Enhanced correction database
+
+## **Key Features**
+
+### **User Experience**
+- **Thai-Optimized UI** - Proper fonts and language support
+- **Progress Tracking** - Visual progress bar and counters
+- **Color-Coded Results** - Green (correct), Red (incorrect), Yellow (suggestions)
+- **Responsive Design** - Works on desktop and mobile
+- **Non-Technical Friendly** - Simple interface for general users
+
+### **Data Management**
+- **Auto-Save** - Continuous saving of progress and corpus
+- **Session Persistence** - Resume work after browser restart
+- **Export Options** - Multiple output formats
+- **Backup System** - Corpus import/export for data safety
+
+### **Quality Control**
+- **Side-by-Side Comparison** - Original vs corrected text display
+- **Confidence Scoring** - AI confidence indicators
+- **Manual Override** - Full control over AI suggestions
+- **Skip Functionality** - Option to skip problematic entries
+
+## 📁 **File Structure**
+```
+thai-text-corrector/
+├── index.html              # Main application
+├── script.js               # Core logic
+├── main-corpus.json        # Master corrections database
+├── corpus-server.py        # Optional file I/O server
+├── requirements-server.txt # Python dependencies
+├── local-ai-setup.md      # AI setup guide
+├── audio/                 # Audio files directory
+├── test-data.tsv          # Sample test data
+└── sample-corpus.json     # Example corpus file
+```
+
+## **Deployment Options**
+
+### **Client-Only Deployment**
+- Open `index.html` in browser
+- Works with Gemini API and manual correction
+- Corpus updates via file download/replace
+
+### **Server-Enhanced Deployment**
+```bash
+pip install -r requirements-server.txt
+python corpus-server.py
+# Access at http://localhost:5000
+```
+- Full file I/O capabilities
+- Automatic corpus file updates
+- Enhanced local AI integration
+
+## **Use Cases**
+
+### **Primary Applications**
+- **Dataset Cleaning** - Correct Thai text in ML datasets
+- **Transcription Review** - Fix speech-to-text output
+- **Content Quality Control** - Standardize Thai text quality
+- **Language Learning** - Educational text correction tool
+
+### **Target Users**
+- **Data Scientists** - Cleaning Thai language datasets
+- **Content Teams** - Non-technical staff correcting text
+- **Researchers** - Processing Thai language corpora
+- **Educators** - Teaching proper Thai language usage
+
+## **Privacy & Security**
+- **Local Processing** - Option for complete offline operation
+- **No Data Retention** - Client-side processing only
+- **Flexible AI** - Choose between cloud and local models
+- **Open Source** - Full code transparency
+
+This project represents a complete solution for Thai text correction with enterprise-grade features, educational value, and research applications, all wrapped in a user-friendly interface suitable for both technical and non-technical users.

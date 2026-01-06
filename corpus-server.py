@@ -17,6 +17,10 @@ CORPUS_FILE = 'main-corpus.json'
 def index():
     return send_from_directory('.', 'index.html')
 
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204  # No Content response
+
 @app.route('/<path:filename>')
 def serve_static(filename):
     return send_from_directory('.', filename)
