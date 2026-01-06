@@ -44,21 +44,55 @@
                         <label class="form-label">เลือก AI Model:</label>
                         <select id="aiModel" class="form-select">
                             <option value="gemini">Google Gemini API</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="openai-compatible">OpenAI Compatible API</option>
                             <option value="manual">Manual Only (ไม่ใช้ AI)</option>
                         </select>
                     </div>
-                    <div class="col-md-6" id="apiKeySection">
-                        <label class="form-label">Gemini API Key:</label>
-                        <input type="password" id="apiKey" class="form-control" placeholder="ใส่ API Key">
+                    <div class="col-md-6" id="apiConfigSection">
+                        <!-- Gemini API Key -->
+                        <div id="geminiConfig" style="display: none;">
+                            <label class="form-label">Gemini API Key:</label>
+                            <input type="password" id="apiKey" class="form-control" placeholder="ใส่ API Key">
+                        </div>
+                        
+                        <!-- Ollama Config -->
+                        <div id="ollamaConfig" style="display: none;">
+                            <label class="form-label">Ollama Server URL:</label>
+                            <input type="text" id="ollamaUrl" class="form-control" placeholder="http://localhost:11434" value="http://localhost:11434">
+                            <label class="form-label mt-2">Model Name:</label>
+                            <select id="ollamaModel" class="form-select">
+                                <option value="llama2">Llama 2</option>
+                                <option value="llama2:13b">Llama 2 13B</option>
+                                <option value="codellama">Code Llama</option>
+                                <option value="mistral">Mistral</option>
+                                <option value="gemma">Gemma</option>
+                                <option value="qwen">Qwen</option>
+                                <option value="thai-llama">Thai-Llama</option>
+                            </select>
+                        </div>
+                        
+                        <!-- OpenAI Compatible Config -->
+                        <div id="openaiConfig" style="display: none;">
+                            <label class="form-label">API Base URL:</label>
+                            <input type="text" id="openaiUrl" class="form-control" placeholder="http://localhost:8000/v1" value="http://localhost:8000/v1">
+                            <label class="form-label mt-2">API Key (optional):</label>
+                            <input type="password" id="openaiKey" class="form-control" placeholder="API Key (ถ้ามี)">
+                            <label class="form-label mt-2">Model Name:</label>
+                            <input type="text" id="openaiModel" class="form-control" placeholder="gpt-3.5-turbo" value="gpt-3.5-turbo">
+                        </div>
                     </div>
                 </div>
                 
                 <!-- Corpus Management -->
                 <div class="mt-3">
                     <h6>📚 จัดการคลังข้อมูลการแก้ไข:</h6>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 flex-wrap">
                         <button id="viewCorpusBtn" class="btn btn-info btn-sm">👁️ ดูคลังข้อมูล</button>
                         <button id="addToCorpusBtn" class="btn btn-success btn-sm">➕ เพิ่มคำ</button>
+                        <button id="exportCorpusBtn" class="btn btn-warning btn-sm">📤 ส่งออก</button>
+                        <button id="importCorpusBtn" class="btn btn-secondary btn-sm">📥 นำเข้า</button>
+                        <button id="resetDefaultsBtn" class="btn btn-outline-primary btn-sm">🔄 รีเซ็ต</button>
                         <button id="clearCorpusBtn" class="btn btn-danger btn-sm">🗑️ ลบทั้งหมด</button>
                     </div>
                     <small class="text-muted">คลังข้อมูลจะช่วยแก้ไขคำผิดอัตโนมัติ เช่น "การจนบุรี" → "กาญจนบุรี"</small>
@@ -84,6 +118,32 @@
                 <div id="currentItem" class="mb-4">
                     <h6>ข้อความปัจจุบัน:</h6>
                     <div id="originalText" class="text-item original-text mb-3"></div>
+                    
+                    <!-- Audio Player Section -->
+                    <div id="audioSection" class="mb-3" style="display: none;">
+                        <h6>🎵 เสียงต้นฉบับ:</h6>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <audio id="audioPlayer" controls class="flex-grow-1">
+                                <source id="audioSource" src="" type="audio/wav">
+                                Your browser does not support the audio element.
+                            </audio>
+                            <button id="playBtn" class="btn btn-outline-primary btn-sm">▶️ เล่น</button>
+                            <button id="pauseBtn" class="btn btn-outline-secondary btn-sm">⏸️ หยุด</button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button id="slowBtn" class="btn btn-outline-info btn-sm">🐌 ช้า (0.75x)</button>
+                            <button id="normalBtn" class="btn btn-outline-success btn-sm">⚡ ปกติ (1x)</button>
+                            <button id="fastBtn" class="btn btn-outline-warning btn-sm">🚀 เร็ว (1.25x)</button>
+                        </div>
+                        <small class="text-muted">อัปโหลดไฟล์เสียงหรือใส่ URL ของไฟล์เสียง</small>
+                    </div>
+                    
+                    <!-- Audio Upload Section -->
+                    <div class="mb-3">
+                        <label class="form-label">📁 อัปโหลดไฟล์เสียง (ถ้ามี):</label>
+                        <input type="file" id="audioUpload" class="form-control" accept="audio/*">
+                        <div class="form-text">รองรับ MP3, WAV, M4A และรูปแบบเสียงอื่นๆ</div>
+                    </div>
                     
                     <div id="autoCorrectInfo" style="display: none;" class="mb-2"></div>
                     

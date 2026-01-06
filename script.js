@@ -5,7 +5,7 @@ class ThaiTextCorrector {
         this.currentIndex = 0;
         this.correctionCorpus = new Map(); // Store incorrect -> correct mappings
         this.init();
-        this.loadCorpus();
+        this.loadCorpus(); // เปลี่ยนเป็น async call
     }
 
     init() {
@@ -20,45 +20,129 @@ class ThaiTextCorrector {
         document.getElementById('viewCorpusBtn').addEventListener('click', () => this.showCorpus());
         document.getElementById('addToCorpusBtn').addEventListener('click', () => this.addToCorpus());
         document.getElementById('clearCorpusBtn').addEventListener('click', () => this.clearCorpus());
+        document.getElementById('exportCorpusBtn').addEventListener('click', () => this.exportCorpus());
+        document.getElementById('importCorpusBtn').addEventListener('click', () => this.importCorpus());
+        document.getElementById('resetDefaultsBtn').addEventListener('click', () => this.resetDefaults());
+        
+        // Audio controls
+        document.getElementById('audioUpload').addEventListener('change', (e) => this.handleAudioUpload(e));
+        document.getElementById('playBtn').addEventListener('click', () => this.playAudio());
+        document.getElementById('pauseBtn').addEventListener('click', () => this.pauseAudio());
+        document.getElementById('slowBtn').addEventListener('click', () => this.setPlaybackSpeed(0.75));
+        document.getElementById('normalBtn').addEventListener('click', () => this.setPlaybackSpeed(1.0));
+        document.getElementById('fastBtn').addEventListener('click', () => this.setPlaybackSpeed(1.25));
         
         this.toggleApiKey();
     }
 
-    loadCorpus() {
+    async loadCorpus() {
+        // โหลดจาก localStorage ก่อน
         const saved = localStorage.getItem('thaiCorrectionCorpus');
         if (saved) {
             const corpusArray = JSON.parse(saved);
             this.correctionCorpus = new Map(corpusArray);
         }
         
-        // Add some common Thai corrections
-        this.addDefaultCorrections();
+        // โหลดจากไฟล์ main-corpus.json
+        await this.loadMainCorpus();
     }
 
-    saveCorpus() {
+    async loadMainCorpus() {
+        try {
+            // ลองโหลดจาก API ก่อน (ถ้ามี server)
+            let response = await fetch('/api/corpus');
+            
+            // ถ้าไม่มี server ให้โหลดจากไฟล์โดยตรง
+            if (!response.ok) {
+                response = await fetch('main-corpus.json');
+            }
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.corrections && Array.isArray(data.corrections)) {
+                    let loadedCount = 0;
+                    
+                    for (const [incorrect, correct] of data.corrections) {
+                        if (!this.correctionCorpus.has(incorrect)) {
+                            this.correctionCorpus.set(incorrect, correct);
+                            loadedCount++;
+                        }
+                    }
+                    
+                    if (loadedCount > 0) {
+                        this.saveCorpusLocal(); // บันทึกแค่ localStorage
+                        console.log(`Loaded ${loadedCount} corrections from corpus`);
+                    }
+                }
+            } else {
+                console.log('Corpus file not found, using localStorage only');
+            }
+        } catch (error) {
+            console.log('Could not load corpus:', error.message);
+        }
+    }
+
+    saveCorpusLocal() {
+        // บันทึกแค่ localStorage
         const corpusArray = Array.from(this.correctionCorpus.entries());
         localStorage.setItem('thaiCorrectionCorpus', JSON.stringify(corpusArray));
     }
 
-    addDefaultCorrections() {
-        const defaultCorrections = {
-            'การจนบุรี': 'กาญจนบุรี',
-            'กานจนบุรี': 'กาญจนบุรี',
-            'การญจนบุรี': 'กาญจนบุรี',
-            'ดิฉัน': 'ดิฉัน',
-            'ผมครับ': 'ผมครับ',
-            'คะ': 'ค่ะ',
-            'ครับผม': 'ครับ',
-            'ไทย': 'ไทย',
-            'ประเทศไทย': 'ประเทศไทย'
-        };
-
-        for (const [incorrect, correct] of Object.entries(defaultCorrections)) {
-            if (!this.correctionCorpus.has(incorrect)) {
-                this.correctionCorpus.set(incorrect, correct);
+    async saveToMainCorpus() {
+        try {
+            const corpusData = {
+                exportDate: new Date().toISOString(),
+                version: "1.0",
+                corrections: Array.from(this.correctionCorpus.entries())
+            };
+            
+            // ลองบันทึกผ่าน API ก่อน
+            const response = await fetch('/api/corpus', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(corpusData)
+            });
+            
+            if (response.ok) {
+                console.log('✅ Corpus saved to main-corpus.json via server');
+                return true;
+            } else {
+                throw new Error('Server not available');
             }
+        } catch (error) {
+            // ถ้าไม่มี server ให้ดาวน์โหลดไฟล์
+            console.log('Server not available, downloading file instead');
+            
+            const corpusData = {
+                exportDate: new Date().toISOString(),
+                version: "1.0",
+                corrections: Array.from(this.correctionCorpus.entries())
+            };
+            
+            const jsonContent = JSON.stringify(corpusData, null, 2);
+            
+            if (confirm('ไม่สามารถอัปเดตไฟล์อัตโนมัติได้\nต้องการดาวน์โหลด main-corpus.json ใหม่หรือไม่?')) {
+                this.downloadFile(jsonContent, 'main-corpus.json', 'application/json');
+                alert('กรุณาแทนที่ไฟล์ main-corpus.json เดิมด้วยไฟล์ที่ดาวน์โหลด');
+            }
+            return false;
         }
-        this.saveCorpus();
+    }
+
+    saveCorpus() {
+        this.saveCorpusLocal();
+        
+        // อัปเดต main-corpus.json ด้วย
+        this.saveToMainCorpus();
+    }
+
+    addDefaultCorrections() {
+        // ไม่ต้องใช้ค่าเริ่มต้นใน code แล้ว
+        // ใช้ข้อมูลจาก main-corpus.json แทน
+        console.log('Using main-corpus.json as default corrections source');
     }
 
     autoCorrectText(text) {
@@ -78,8 +162,23 @@ class ThaiTextCorrector {
 
     toggleApiKey() {
         const model = document.getElementById('aiModel').value;
-        const apiSection = document.getElementById('apiKeySection');
-        apiSection.style.display = model === 'gemini' ? 'block' : 'none';
+        const geminiConfig = document.getElementById('geminiConfig');
+        const ollamaConfig = document.getElementById('ollamaConfig');
+        const openaiConfig = document.getElementById('openaiConfig');
+        
+        // Hide all configs first
+        geminiConfig.style.display = 'none';
+        ollamaConfig.style.display = 'none';
+        openaiConfig.style.display = 'none';
+        
+        // Show relevant config
+        if (model === 'gemini') {
+            geminiConfig.style.display = 'block';
+        } else if (model === 'ollama') {
+            ollamaConfig.style.display = 'block';
+        } else if (model === 'openai-compatible') {
+            openaiConfig.style.display = 'block';
+        }
     }
 
     async loadTSV() {
@@ -136,7 +235,8 @@ class ThaiTextCorrector {
         this.corrections = this.tsvData.map(item => ({
             original: item.text,
             corrected: item.text,
-            status: 'pending' // pending, corrected, skipped
+            status: 'pending', // pending, corrected, skipped
+            audioFile: item.file_name || null // Store audio filename if available
         }));
     }
 
@@ -181,26 +281,128 @@ class ThaiTextCorrector {
         document.getElementById('originalText').textContent = current.text;
         document.getElementById('correctedText').value = correction.corrected;
 
+        // Handle audio if available
+        this.setupAudio(current);
+
         // Enable/disable AI button
         const aiModel = document.getElementById('aiModel').value;
         document.getElementById('aiCorrectBtn').disabled = aiModel === 'manual';
     }
 
+    setupAudio(currentItem) {
+        const audioSection = document.getElementById('audioSection');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const audioSource = document.getElementById('audioSource');
+        
+        // Check if there's an audio file reference
+        if (currentItem.file_name && currentItem.file_name.includes('.wav')) {
+            audioSection.style.display = 'block';
+            
+            // Try to load audio file (you might need to adjust the path)
+            const audioPath = `audio/${currentItem.file_name}`;
+            audioSource.src = audioPath;
+            audioPlayer.load();
+            
+            // Show audio filename
+            document.getElementById('originalText').innerHTML = `
+                ${currentItem.text}<br>
+                <small class="text-muted">🎵 Audio: ${currentItem.file_name}</small>
+            `;
+        } else {
+            audioSection.style.display = 'none';
+        }
+    }
+
+    handleAudioUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const audioPlayer = document.getElementById('audioPlayer');
+            const audioSource = document.getElementById('audioSource');
+            const audioSection = document.getElementById('audioSection');
+            
+            // Create URL for uploaded file
+            const audioURL = URL.createObjectURL(file);
+            audioSource.src = audioURL;
+            audioPlayer.load();
+            audioSection.style.display = 'block';
+            
+            console.log(`Loaded audio file: ${file.name}`);
+        }
+    }
+
+    playAudio() {
+        const audioPlayer = document.getElementById('audioPlayer');
+        audioPlayer.play().catch(e => {
+            console.log('Audio play failed:', e);
+            alert('ไม่สามารถเล่นเสียงได้ กรุณาตรวจสอบไฟล์เสียง');
+        });
+    }
+
+    pauseAudio() {
+        const audioPlayer = document.getElementById('audioPlayer');
+        audioPlayer.pause();
+    }
+
+    setPlaybackSpeed(speed) {
+        const audioPlayer = document.getElementById('audioPlayer');
+        audioPlayer.playbackRate = speed;
+        
+        // Update button states
+        document.querySelectorAll('#slowBtn, #normalBtn, #fastBtn').forEach(btn => {
+            btn.classList.remove('btn-info', 'btn-success', 'btn-warning');
+            btn.classList.add('btn-outline-info', 'btn-outline-success', 'btn-outline-warning');
+        });
+        
+        // Highlight active speed
+        if (speed === 0.75) {
+            document.getElementById('slowBtn').classList.remove('btn-outline-info');
+            document.getElementById('slowBtn').classList.add('btn-info');
+        } else if (speed === 1.0) {
+            document.getElementById('normalBtn').classList.remove('btn-outline-success');
+            document.getElementById('normalBtn').classList.add('btn-success');
+        } else if (speed === 1.25) {
+            document.getElementById('fastBtn').classList.remove('btn-outline-warning');
+            document.getElementById('fastBtn').classList.add('btn-warning');
+        }
+    }
+
     async aiCorrect() {
         const aiModel = document.getElementById('aiModel').value;
-        if (aiModel !== 'gemini') return;
-
-        const apiKey = document.getElementById('apiKey').value;
-        if (!apiKey) {
-            alert('กรุณาใส่ Gemini API Key');
-            return;
-        }
+        if (aiModel === 'manual') return;
 
         this.showLoading(true);
 
         try {
             const originalText = this.tsvData[this.currentIndex].text;
-            const prompt = `ทำการแก้ไขข้อความที่ผิด และไม่ถูกต้องในบริบท
+            let correctedText;
+
+            if (aiModel === 'gemini') {
+                correctedText = await this.correctWithGemini(originalText);
+            } else if (aiModel === 'ollama') {
+                correctedText = await this.correctWithOllama(originalText);
+            } else if (aiModel === 'openai-compatible') {
+                correctedText = await this.correctWithOpenAI(originalText);
+            }
+
+            if (correctedText) {
+                document.getElementById('correctedText').value = correctedText;
+                this.corrections[this.currentIndex].corrected = correctedText;
+            }
+
+        } catch (error) {
+            alert('เกิดข้อผิดพลาดจาก AI: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async correctWithGemini(originalText) {
+        const apiKey = document.getElementById('apiKey').value;
+        if (!apiKey) {
+            throw new Error('กรุณาใส่ Gemini API Key');
+        }
+
+        const prompt = `ทำการแก้ไขข้อความที่ผิด และไม่ถูกต้องในบริบท
 คำต้นฉบับ:<WRD>${originalText}</WRD>
 คำที่ถูกต้อง:<WRD>(ตอบเฉพาะข้อความที่แก้ไขแล้ว)</WRD>
 
@@ -212,35 +414,128 @@ class ThaiTextCorrector {
 
 ตอบเฉพาะข้อความที่แก้ไขแล้วเท่านั้น ไม่ต้องอธิบาย`;
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
-            });
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
 
-            if (!response.ok) {
-                throw new Error('Gemini API Error');
-            }
-
-            const data = await response.json();
-            let correctedText = data.candidates[0].content.parts[0].text.trim();
-            
-            // Extract text from <WRD> tags if present
-            const wrdMatch = correctedText.match(/<WRD>(.*?)<\/WRD>/);
-            if (wrdMatch) {
-                correctedText = wrdMatch[1];
-            }
-
-            document.getElementById('correctedText').value = correctedText;
-            this.corrections[this.currentIndex].corrected = correctedText;
-
-        } catch (error) {
-            alert('เกิดข้อผิดพลาดจาก AI: ' + error.message);
-        } finally {
-            this.showLoading(false);
+        if (!response.ok) {
+            throw new Error('Gemini API Error');
         }
+
+        const data = await response.json();
+        let correctedText = data.candidates[0].content.parts[0].text.trim();
+        
+        // Extract text from <WRD> tags if present
+        const wrdMatch = correctedText.match(/<WRD>(.*?)<\/WRD>/);
+        if (wrdMatch) {
+            correctedText = wrdMatch[1];
+        }
+
+        return correctedText;
+    }
+
+    async correctWithOllama(originalText) {
+        const ollamaUrl = document.getElementById('ollamaUrl').value;
+        const modelName = document.getElementById('ollamaModel').value;
+        
+        if (!ollamaUrl) {
+            throw new Error('กรุณาใส่ Ollama Server URL');
+        }
+
+        const prompt = `แก้ไขข้อความภาษาไทยต่อไปนี้ให้ถูกต้อง:
+
+ข้อความต้นฉบับ: "${originalText}"
+
+กรุณาแก้ไข:
+- การสะกดคำ
+- ไวยากรณ์ 
+- การใช้คำที่เหมาะสม
+- ความถูกต้องของภาษา
+
+ตอบเฉพาะข้อความที่แก้ไขแล้วเท่านั้น ไม่ต้องอธิบาย:`;
+
+        const response = await fetch(`${ollamaUrl}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: modelName,
+                prompt: prompt,
+                stream: false,
+                options: {
+                    temperature: 0.3,
+                    top_p: 0.9,
+                    max_tokens: 200
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Ollama API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.response.trim();
+    }
+
+    async correctWithOpenAI(originalText) {
+        const baseUrl = document.getElementById('openaiUrl').value;
+        const apiKey = document.getElementById('openaiKey').value;
+        const modelName = document.getElementById('openaiModel').value;
+        
+        if (!baseUrl) {
+            throw new Error('กรุณาใส่ API Base URL');
+        }
+
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        if (apiKey) {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+
+        const prompt = `แก้ไขข้อความภาษาไทยต่อไปนี้ให้ถูกต้อง:
+
+ข้อความต้นฉบับ: "${originalText}"
+
+กรุณาแก้ไข:
+- การสะกดคำ
+- ไวยากรณ์
+- การใช้คำที่เหมาะสม  
+- ความถูกต้องของภาษา
+
+ตอบเฉพาะข้อความที่แก้ไขแล้วเท่านั้น ไม่ต้องอธิบาย`;
+
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                model: modelName,
+                messages: [
+                    {
+                        role: "system",
+                        content: "คุณเป็นผู้เชี่ยวชาญด้านภาษาไทย ช่วยแก้ไขข้อความให้ถูกต้อง"
+                    },
+                    {
+                        role: "user", 
+                        content: prompt
+                    }
+                ],
+                temperature: 0.3,
+                max_tokens: 200
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content.trim();
     }
 
     acceptCorrection() {
@@ -334,6 +629,64 @@ class ThaiTextCorrector {
             this.correctionCorpus.clear();
             this.saveCorpus();
             alert('ลบคลังข้อมูลแล้ว');
+        }
+    }
+
+    exportCorpus() {
+        const corpusData = {
+            exportDate: new Date().toISOString(),
+            version: "1.0",
+            corrections: Array.from(this.correctionCorpus.entries())
+        };
+        
+        const jsonContent = JSON.stringify(corpusData, null, 2);
+        this.downloadFile(jsonContent, 'thai_correction_corpus.json', 'application/json');
+        alert('ส่งออกคลังข้อมูลแล้ว!');
+    }
+
+    importCorpus() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        
+                        if (data.corrections && Array.isArray(data.corrections)) {
+                            let importedCount = 0;
+                            
+                            for (const [incorrect, correct] of data.corrections) {
+                                this.correctionCorpus.set(incorrect, correct);
+                                importedCount++;
+                            }
+                            
+                            this.saveCorpus();
+                            alert(`นำเข้าคลังข้อมูลสำเร็จ! เพิ่ม ${importedCount} รายการ`);
+                        } else {
+                            alert('รูปแบบไฟล์ไม่ถูกต้อง');
+                        }
+                    } catch (error) {
+                        alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        };
+        
+        input.click();
+    }
+
+    resetDefaults() {
+        if (confirm('ต้องการรีเซ็ตคลังข้อมูลจาก main-corpus.json หรือไม่? (จะลบข้อมูลปัจจุบันทั้งหมด)')) {
+            this.correctionCorpus.clear();
+            localStorage.removeItem('thaiCorrectionCorpus');
+            this.loadMainCorpus();
+            alert('รีเซ็ตคลังข้อมูลจาก main-corpus.json แล้ว!');
         }
     }
 
