@@ -579,17 +579,80 @@ class ThaiTextCorrector {
         
         console.log('Accept correction:', { originalText, correctedText });
         
-        // If text was changed, add to corpus for future auto-corrections
-        if (originalText !== correctedText) {
-            console.log('Text changed, learning from correction...');
-            this.learnFromCorrection(originalText, correctedText);
+        // Check for pipe delimiter format: "wrong|correct"
+        if (correctedText.includes('|')) {
+            console.log('Pipe delimiter detected, processing manual corrections...');
+            this.processPipeDelimitedCorrections(correctedText);
+            
+            // Remove pipe delimiters for the final corrected text
+            // Handle both "word|word" and "word|word nextword" patterns
+            let finalText = correctedText.replace(/\s*(\S+)\|(\S+)(\s+)(\S+)/g, '$2$4'); // "มิน|มีน บุรี" -> "มีนบุรี"
+            finalText = finalText.replace(/(\S+)\|(\S+)/g, '$2'); // remaining "word|word" -> "word"
+            
+            this.corrections[this.currentIndex].corrected = finalText;
         } else {
-            console.log('No changes detected, skipping learning');
+            // Normal correction process
+            if (originalText !== correctedText) {
+                console.log('Text changed, learning from correction...');
+                this.learnFromCorrection(originalText, correctedText);
+            } else {
+                console.log('No changes detected, skipping learning');
+            }
+            this.corrections[this.currentIndex].corrected = correctedText;
         }
         
-        this.corrections[this.currentIndex].corrected = correctedText;
         this.corrections[this.currentIndex].status = 'corrected';
         this.nextItem();
+    }
+
+    processPipeDelimitedCorrections(text) {
+        // Find all patterns like "wrong|correct"
+        const pipePattern = /(\S+)\|(\S+)/g;
+        let match;
+        let addedCount = 0;
+        
+        console.log('Processing pipe delimited text:', text);
+        
+        while ((match = pipePattern.exec(text)) !== null) {
+            const wrongWord = match[1];
+            const correctWord = match[2];
+            
+            console.log('Found pipe pair:', wrongWord, '→', correctWord);
+            
+            if (wrongWord && correctWord && wrongWord !== correctWord) {
+                this.correctionCorpus.set(wrongWord, correctWord);
+                console.log(`Pipe learning: ${wrongWord} → ${correctWord}`);
+                addedCount++;
+            }
+        }
+        
+        if (addedCount > 0) {
+            this.saveCorpus();
+            console.log(`Added ${addedCount} corrections from pipe delimiters`);
+            
+            // Show notification
+            this.showPipeNotification(addedCount);
+        }
+    }
+
+    showPipeNotification(count) {
+        // Create a temporary notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-success position-fixed';
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            <strong>📚 เพิ่มใน Corpus แล้ว!</strong><br>
+            พบ ${count} คู่คำจาก pipe delimiter (|)
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
     }
 
     learnFromCorrection(originalText, correctedText) {
